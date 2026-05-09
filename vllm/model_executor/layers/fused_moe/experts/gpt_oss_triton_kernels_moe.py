@@ -532,7 +532,7 @@ class BaseOAITritonExperts(mk.FusedMoEExpertsModular):
         # and ROCm gfx942/gfx950 (which map to 9.4/9.5).
         if not has_triton_kernels():
             return False
-        return (9, 0) <= (cap.major, cap.minor) < (11, 0)
+        return (9, 0) <= (cap.major, cap.minor) < (12, 0)
 
     @staticmethod
     def _supports_no_act_and_mul() -> bool:
@@ -946,7 +946,7 @@ class OAITritonMxfp4ExpertsMonolithic(mk.FusedMoEExpertsMonolithic):
         # and ROCm gfx942/gfx950 (which map to 9.4/9.5).
         if not has_triton_kernels():
             return False
-        return (9, 0) <= (cap.major, cap.minor) < (11, 0)
+        return (9, 0) <= (cap.major, cap.minor) < (12, 0)
 
     @staticmethod
     def _supports_no_act_and_mul() -> bool:

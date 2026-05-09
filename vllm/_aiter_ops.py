@@ -11,6 +11,7 @@ from torch.distributed import ProcessGroup
 
 import vllm.envs as envs
 from vllm.platforms import current_platform
+from vllm.platforms.rocm import on_gfx1x
 from vllm.utils.import_utils import PlaceholderModule
 from vllm.utils.torch_utils import direct_register_custom_op
 from vllm.v1.attention.ops.rocm_aiter_mla_sparse import (
@@ -80,9 +81,9 @@ def is_aiter_found_and_supported() -> bool:
     VLLM_ROCM_USE_AITER=0, while preventing unwanted JIT warnings for auto-discovery.
     """
     if current_platform.is_rocm() and IS_AITER_FOUND:
-        from vllm.platforms.rocm import on_mi3xx
+        from vllm.platforms.rocm import on_mi3xx, on_gfx1x
 
-        return on_mi3xx()
+        return (on_mi3xx() or on_gfx1x())
     return False
 
 
@@ -1323,12 +1324,12 @@ class rocm_aiter_ops:
     @classmethod
     @if_aiter_supported
     def is_linear_fp8_enabled(cls) -> bool:
-        return cls.is_linear_enabled()
+        return False
 
     @classmethod
     @if_aiter_supported
     def is_fused_moe_enabled(cls) -> bool:
-        return cls._AITER_ENABLED and cls._FMOE_ENABLED
+        return cls._AITER_ENABLED and cls._FMOE_ENABLED and not getattr(on_gfx1x, "__call__", lambda: False)()
 
     @classmethod
     @if_aiter_supported

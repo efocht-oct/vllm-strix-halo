@@ -1,3 +1,62 @@
+
+# --- ROCM-21812 VRAM DYNAMIC PATCH ---
+import torch
+import glob
+import os
+
+try:
+    _orig_mem_info = torch.cuda.mem_get_info
+    _orig_get_dev_prop = torch.cuda.get_device_properties
+
+    class MockCudaDeviceProperties:
+        def __init__(self, prop, override_total):
+            self._prop = prop
+            self.total_memory = override_total
+        def __getattr__(self, name):
+            return getattr(self._prop, name)
+        def __dir__(self):
+            return dir(self._prop)
+
+    def _patched_mem_info(device=None):
+        free, total = _orig_mem_info(device)
+        try:
+            # On APUs, ROCm clamps total to 50% limit. We need the real GTT limits.
+            if total < 70 * 1024**3: 
+                drm_cards = glob.glob('/sys/class/drm/card*/device/mem_info_gtt_total')
+                if drm_cards:
+                    card_dir = os.path.dirname(drm_cards[0])
+                    with open(os.path.join(card_dir, 'mem_info_gtt_total'), 'r') as f:
+                        gtt_total = int(f.read().strip())
+                    with open(os.path.join(card_dir, 'mem_info_gtt_used'), 'r') as f:
+                        gtt_used = int(f.read().strip())
+                    
+                    # Symmetrically carve 8GB off the TOP of the device perfectly.
+                    safe_ceiling = gtt_total - (8 * 1024**3)
+                    
+                    real_total = safe_ceiling
+                    real_free = max(0, safe_ceiling - gtt_used)
+                    
+                    total = max(total, real_total)
+                    free = real_free
+        except Exception as e:
+            pass
+        return int(free), int(total)
+
+    def _patched_get_dev_prop(device=None):
+        prop = _orig_get_dev_prop(device)
+        free, total = _patched_mem_info(device)
+        if hasattr(prop, 'total_memory') and prop.total_memory < total:
+            return MockCudaDeviceProperties(prop, total)
+        return prop
+
+    torch.cuda.mem_get_info = _patched_mem_info
+    torch.cuda.get_device_properties = _patched_get_dev_prop
+except Exception:
+    pass
+# ---------------------------
+import sys
+from unittest.mock import MagicMock
+sys.modules["amdsmi"] = MagicMock()
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
@@ -162,6 +221,9 @@ def _query_gcn_arch_from_amdsmi() -> str:
 
 
 def _get_gcn_arch() -> str:
+    return "gfx1151"
+
+def _old_get_gcn_arch() -> str:
     """
     Get GCN arch via amdsmi (no CUDA init), fallback to torch.cuda.
     Called once at module level; result stored in _GCN_ARCH.
@@ -947,7 +1009,7 @@ class RocmPlatform(Platform):
             and envs.VLLM_ROCM_USE_AITER
             and envs.VLLM_ROCM_USE_AITER_RMSNORM
         ):
-            rms_norm = ["aiter"] + default
+            rms_norm = ["aiter"] + default if not on_gfx1x() else default
         else:
             rms_norm = default
 

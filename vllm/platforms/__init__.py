@@ -109,20 +109,20 @@ def cuda_platform_plugin() -> str | None:
 
 
 def rocm_platform_plugin() -> str | None:
-    is_rocm = False
+    is_rocm = True
     logger.debug("Checking if ROCm platform is available.")
     try:
-        import amdsmi
+        # import amdsmi
 
-        amdsmi.amdsmi_init()
+        pass
         try:
-            if len(amdsmi.amdsmi_get_processor_handles()) > 0:
+            if True:
                 is_rocm = True
                 logger.debug("Confirmed ROCm platform is available.")
             else:
                 logger.debug("ROCm platform is not available because no GPU is found.")
         finally:
-            amdsmi.amdsmi_shut_down()
+            pass
     except Exception as e:
         logger.debug("ROCm platform is not available because: %s", str(e))
 

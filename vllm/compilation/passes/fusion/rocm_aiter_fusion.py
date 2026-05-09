@@ -109,7 +109,7 @@ class AiterRMSNormDynamicQuantPattern(AiterRMSNormQuantPattern):
             # input, weight
             [self.empty(5, 16), self.empty(16)],
             pm.fwd_only,
-            pm_pass,
+            pm_pass, skip_duplicates=True,
         )
 
 
@@ -171,7 +171,7 @@ class AiterFusedAddRMSNormDynamicQuantPattern(AiterRMSNormQuantPattern):
             replacement,
             inputs,
             pm.fwd_only,
-            pm_pass,
+            pm_pass, skip_duplicates=True,
         )
 
 
@@ -227,7 +227,7 @@ class AiterRMSFp8GroupQuantPattern(AiterRMSNormQuantPattern):
             # input, weight
             [self.empty(5, 16), self.empty(16)],
             pm.fwd_only,
-            pm_pass,
+            pm_pass, skip_duplicates=True,
         )
 
 
@@ -290,7 +290,7 @@ class AiterFusedAddRMSFp8GroupQuantPattern(AiterRMSNormQuantPattern):
             self.empty(5, 16),  # residual
         ]
 
-        pm.register_replacement(pattern, replacement, inputs, pm.fwd_only, pm_pass)
+        pm.register_replacement(pattern, replacement, inputs, pm.fwd_only, pm_pass, skip_duplicates=True)
 
 
 class RocmAiterRMSNormQuantFusionPass(VllmPatternMatcherPass):
@@ -495,7 +495,7 @@ class AddAiterRMSNormPadPattern:
             return result_padded, residual_out, router_logits
 
         pm.register_replacement(
-            pattern, replacement, self.get_inputs(), pm.fwd_only, pm_pass
+            pattern, replacement, self.get_inputs(), pm.fwd_only, pm_pass, skip_duplicates=True
         )
 
 

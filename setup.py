@@ -37,7 +37,8 @@ logger = logging.getLogger(__name__)
 #  which is not installed yet
 envs = load_module_from_path("envs", os.path.join(ROOT_DIR, "vllm", "envs.py"))
 
-VLLM_TARGET_DEVICE = envs.VLLM_TARGET_DEVICE
+VLLM_TARGET_DEVICE = "rocm"  # FORCED for Strix Halo build
+# Original: VLLM_TARGET_DEVICE = envs.VLLM_TARGET_DEVICE
 
 if sys.platform.startswith("darwin") and VLLM_TARGET_DEVICE != "cpu":
     logger.warning("VLLM_TARGET_DEVICE automatically set to `cpu` due to macOS")
@@ -50,18 +51,19 @@ elif not (sys.platform.startswith("linux") or sys.platform.startswith("darwin"))
         sys.platform,
     )
     VLLM_TARGET_DEVICE = "empty"
-elif sys.platform.startswith("linux") and os.getenv("VLLM_TARGET_DEVICE") is None:
-    if torch.version.hip is not None:
-        VLLM_TARGET_DEVICE = "rocm"
-        logger.info("Auto-detected ROCm")
-    elif torch.version.xpu is not None:
-        VLLM_TARGET_DEVICE = "xpu"
-        logger.info("Auto-detected XPU")
-    elif torch.version.cuda is not None:
-        VLLM_TARGET_DEVICE = "cuda"
-        logger.info("Auto-detected CUDA")
-    else:
-        VLLM_TARGET_DEVICE = "cpu"
+# Auto-detection disabled - VLLM_TARGET_DEVICE forced to rocm above
+    # elif sys.platform.startswith("linux") and os.getenv("VLLM_TARGET_DEVICE") is None:
+    #     if torch.version.hip is not None:
+    #         VLLM_TARGET_DEVICE = "rocm"
+    #         logger.info("Auto-detected ROCm")
+    #     elif torch.version.xpu is not None:
+    #         VLLM_TARGET_DEVICE = "xpu"
+    #         logger.info("Auto-detected XPU")
+    #     elif torch.version.cuda is not None:
+    #         VLLM_TARGET_DEVICE = "cuda"
+    #         logger.info("Auto-detected CUDA")
+    #     else:
+    #         VLLM_TARGET_DEVICE = "cpu"
 
 
 def is_sccache_available() -> bool:
@@ -933,6 +935,11 @@ def get_vllm_version() -> str:
             version += f"{sep}cpu"
     elif _is_xpu():
         version += f"{sep}xpu"
+    elif os.environ.get("VLLM_TARGET_DEVICE") == "rocm" or _is_hip():
+        rocm_version = get_rocm_version() or (torch.version.hip if hasattr(torch.version, "hip") else None)
+        if rocm_version and rocm_version != envs.VLLM_MAIN_CUDA_VERSION:
+            r_str = rocm_version.replace(".", "")
+            version += f"{sep}rocm{r_str[:3]}"
     else:
         raise RuntimeError("Unknown runtime environment")
 
